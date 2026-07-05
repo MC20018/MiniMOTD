@@ -24,8 +24,6 @@
 package xyz.jpenilla.minimotd.fand;
 
 import io.fand.api.Fand;
-import io.fand.api.command.CommandDescriptor;
-import io.fand.api.command.CommandSender;
 import io.fand.api.event.server.ServerListIcon;
 import io.fand.api.event.server.ServerListPingEvent;
 import io.fand.api.plugin.Plugin;
@@ -34,7 +32,6 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
 import javax.imageio.ImageIO;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -45,8 +42,6 @@ import xyz.jpenilla.minimotd.common.PingResponse;
 import xyz.jpenilla.minimotd.common.config.MOTDConfig;
 
 public final class MiniMOTDFand implements Plugin, MiniMOTDPlatform<ServerListIcon> {
-  private static final List<String> COMMANDS = List.of("about", "reload", "help");
-
   private PluginContext context;
   private MiniMOTD<ServerListIcon> miniMOTD;
   private CommandHandler commandHandler;
@@ -57,11 +52,12 @@ public final class MiniMOTDFand implements Plugin, MiniMOTDPlatform<ServerListIc
     this.miniMOTD = new MiniMOTD<>(this);
     this.commandHandler = new CommandHandler(this.miniMOTD);
 
-    context.commands().register(
-      new CommandDescriptor("minimotd", "minimotd", COMMANDS, List.of(), "minimotd.admin"),
-      (sender, label, args) -> this.executeCommand(args, sender),
-      (sender, label, args) -> this.completeCommand(args)
-    );
+    context.commands().register("minimotd", command -> command
+      .permission("minimotd.admin")
+      .executes(commandContext -> this.commandHandler.help(commandContext.sender()))
+      .literal("about", about -> about.executes(commandContext -> this.commandHandler.about(commandContext.sender())))
+      .literal("reload", reload -> reload.executes(commandContext -> this.commandHandler.reload(commandContext.sender())))
+      .literal("help", help -> help.executes(commandContext -> this.commandHandler.help(commandContext.sender()))));
     context.events().subscribe(ServerListPingEvent.class, this::handlePing);
   }
 
@@ -85,26 +81,6 @@ public final class MiniMOTDFand implements Plugin, MiniMOTDPlatform<ServerListIc
   @Override
   public void onReload() {
     Fand.server().refreshServerListStatus();
-  }
-
-  private void executeCommand(final List<String> args, final CommandSender sender) {
-    final String subcommand = args.isEmpty() ? "help" : args.get(0).toLowerCase(Locale.ROOT);
-    switch (subcommand) {
-      case "about" -> this.commandHandler.about(sender);
-      case "reload" -> this.commandHandler.reload(sender);
-      case "help" -> this.commandHandler.help(sender);
-      default -> this.commandHandler.help(sender);
-    }
-  }
-
-  private List<String> completeCommand(final List<String> args) {
-    if (args.size() != 1) {
-      return List.of();
-    }
-    final String prefix = args.get(0).toLowerCase(Locale.ROOT);
-    return COMMANDS.stream()
-      .filter(option -> option.startsWith(prefix))
-      .toList();
   }
 
   private void handlePing(final ServerListPingEvent event) {
